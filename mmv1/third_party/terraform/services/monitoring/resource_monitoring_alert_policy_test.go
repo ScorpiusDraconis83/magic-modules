@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
 	transport_tpg "github.com/hashicorp/terraform-provider-google/google/transport"
 )
@@ -329,6 +329,10 @@ resource "google_monitoring_alert_policy" "full" {
     content   = "test content"
     mime_type = "text/markdown"
     subject = "test subject"
+    links {
+        display_name = "link display name"
+        url = "http://mydomain.com"
+    }
   }
 }
 `, alertName, conditionName1, conditionName2)
@@ -360,6 +364,14 @@ resource "google_monitoring_alert_policy" "mql" {
     content   = "test content"
     mime_type = "text/markdown"
     subject = "test subject"
+    links {
+        display_name = "link display name"
+        url = "http://mydomain.com"
+    }
+    links {
+        display_name = "link display name2"
+        url = "http://mydomain2.com"
+    }
   }
 }
 `, alertName, conditionName)
@@ -387,7 +399,8 @@ resource "google_monitoring_alert_policy" "log" {
     notification_rate_limit {
       period = "300s"
     }
-    auto_close = "2000s"
+    auto_close           = "2000s"
+    notification_prompts = ["OPENED"]
   }
 
   severity     = "WARNING"
@@ -395,7 +408,7 @@ resource "google_monitoring_alert_policy" "log" {
   documentation {
     content   = "test content"
     mime_type = "text/markdown"
-    subject = "test subject"    
+    subject = "test subject"
   }
 }
 `, alertName, conditionName)
@@ -448,6 +461,7 @@ resource "google_monitoring_alert_policy" "promql" {
       }
       alert_rule      = "AlwaysOn"
       rule_group      = "abc"
+      disable_metric_validation = true
     }
   }
 
@@ -457,6 +471,10 @@ resource "google_monitoring_alert_policy" "promql" {
     content   = "test content"
     mime_type = "text/markdown"
     subject = "test subject"
+    links {
+        display_name = "link display name"
+        url = "http://mydomain.com"
+    }
   }
 }
 `, alertName, conditionName)

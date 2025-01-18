@@ -4,7 +4,7 @@ description: |-
   Manages a Cloud Dataproc cluster resource.
 ---
 
-# google\_dataproc\_cluster
+# google_dataproc_cluster
 
 Manages a Cloud Dataproc cluster resource within GCP.
 
@@ -214,7 +214,7 @@ resource "google_dataproc_cluster" "accelerated_cluster" {
 
         kubernetes_software_config {
           component_version = {
-            "SPARK" : "3.1-dataproc-7"
+            "SPARK" : "3.5-dataproc-17"
           }
 
           properties = {
@@ -448,6 +448,9 @@ resource "google_dataproc_cluster" "accelerated_cluster" {
 * `node_group_affinity` - (Optional) Node Group Affinity for sole-tenant clusters.
     * `node_group_uri` - (Required) The URI of a sole-tenant node group resource that the cluster will be created on.
 
+* `confidential_instance_config` - (Optional) Confidential Instance Config for clusters using [Confidential VMs](https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/confidential-compute)
+    * `enable_confidential_compute` - (Optional) Defines whether the instance should have confidential compute enabled.
+
 * `shielded_instance_config` (Optional) Shielded Instance Config for clusters using [Compute Engine Shielded VMs](https://cloud.google.com/security/shielded-cloud/shielded-vm).
 
 - - -
@@ -521,6 +524,11 @@ cluster_config {
 
 	* `num_local_ssds` - (Optional) The amount of local SSD disks that will be
 	attached to each master cluster node. Defaults to 0.
+
+	* `local_ssd_interface` - Optional. Interface type of local SSDs (default is "scsi").
+	Valid values: "scsi" (Small Computer System Interface), "nvme" (Non-Volatile
+	Memory Express). See
+	[local SSD performance](https://cloud.google.com/compute/docs/disks/local-ssd#performance).
 
 * `accelerators` (Optional) The Compute Engine accelerator (GPU) configuration for these instances. Can be specified multiple times.
 
@@ -926,7 +934,7 @@ cluster_config {
 ```hcl
 cluster_config {
   endpoint_config {
-    enable_http_port_access = "true"
+    enable_http_port_access = true
   }
 }
 ```

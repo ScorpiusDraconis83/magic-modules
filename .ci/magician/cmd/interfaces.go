@@ -21,30 +21,36 @@ import (
 
 type GithubClient interface {
 	GetPullRequest(prNumber string) (github.PullRequest, error)
+	GetPullRequests(state, base, sort, direction string) ([]github.PullRequest, error)
 	GetPullRequestRequestedReviewers(prNumber string) ([]github.User, error)
 	GetPullRequestPreviousReviewers(prNumber string) ([]github.User, error)
+	GetPullRequestComments(prNumber string) ([]github.PullRequestComment, error)
 	GetUserType(user string) github.UserType
 	GetTeamMembers(organization, team string) ([]github.User, error)
+	MergePullRequest(owner, repo, prNumber, commitSha string) error
 	PostBuildStatus(prNumber, title, state, targetURL, commitSha string) error
 	PostComment(prNumber, comment string) error
-	RequestPullRequestReviewer(prNumber, assignee string) error
-	AddLabel(prNumber, label string) error
+	UpdateComment(prNumber, comment string, id int) error
+	RequestPullRequestReviewers(prNumber string, reviewers []string) error
+	AddLabels(prNumber string, labels []string) error
 	RemoveLabel(prNumber, label string) error
 	CreateWorkflowDispatchEvent(workflowFileName string, inputs map[string]any) error
 }
 
 type CloudbuildClient interface {
-	ApproveCommunityChecker(prNumber, commitSha string) error
-	GetAwaitingApprovalBuildLink(prNumber, commitSha string) (string, error)
-	TriggerMMPresubmitRuns(commitSha string, substitutions map[string]string) error
+	ApproveDownstreamGenAndTest(prNumber, commitSha string) error
 }
 
 type ExecRunner interface {
 	GetCWD() string
 	Copy(src, dest string) error
+	Mkdir(path string) error
 	RemoveAll(path string) error
 	PushDir(path string) error
 	PopDir() error
+	ReadFile(name string) (string, error)
+	WriteFile(name, data string) error
+	AppendFile(name, data string) error // Not used (yet).
 	Run(name string, args []string, env map[string]string) (string, error)
 	MustRun(name string, args []string, env map[string]string) string
 }

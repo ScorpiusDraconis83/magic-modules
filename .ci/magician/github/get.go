@@ -18,6 +18,7 @@ package github
 import (
 	"fmt"
 	utils "magician/utility"
+	"time"
 )
 
 type User struct {
@@ -29,8 +30,20 @@ type Label struct {
 }
 
 type PullRequest struct {
-	User   User    `json:"user"`
-	Labels []Label `json:"labels"`
+	HTMLUrl        string  `json:"html_url"`
+	Number         int     `json:"number"`
+	Title          string  `json:"title"`
+	User           User    `json:"user"`
+	Body           string  `json:"body"`
+	Labels         []Label `json:"labels"`
+	MergeCommitSha string  `json:"merge_commit_sha"`
+}
+
+type PullRequestComment struct {
+	User      User      `json:"user"`
+	Body      string    `json:"body"`
+	ID        int       `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func (gh *Client) GetPullRequest(prNumber string) (PullRequest, error) {
@@ -38,12 +51,19 @@ func (gh *Client) GetPullRequest(prNumber string) (PullRequest, error) {
 
 	var pullRequest PullRequest
 
-	_, err := utils.RequestCall(url, "GET", gh.token, &pullRequest, nil)
-	if err != nil {
-		return pullRequest, err
-	}
+	err := utils.RequestCall(url, "GET", gh.token, &pullRequest, nil)
 
-	return pullRequest, nil
+	return pullRequest, err
+}
+
+func (gh *Client) GetPullRequests(state, base, sort, direction string) ([]PullRequest, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/GoogleCloudPlatform/magic-modules/pulls?state=%s&base=%s&sort=%s&direction=%s", state, base, sort, direction)
+
+	var pullRequests []PullRequest
+
+	err := utils.RequestCall(url, "GET", gh.token, &pullRequests, nil)
+
+	return pullRequests, err
 }
 
 func (gh *Client) GetPullRequestRequestedReviewers(prNumber string) ([]User, error) {
@@ -53,7 +73,7 @@ func (gh *Client) GetPullRequestRequestedReviewers(prNumber string) ([]User, err
 		Users []User `json:"users"`
 	}
 
-	_, err := utils.RequestCall(url, "GET", gh.token, &requestedReviewers, nil)
+	err := utils.RequestCall(url, "GET", gh.token, &requestedReviewers, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +88,7 @@ func (gh *Client) GetPullRequestPreviousReviewers(prNumber string) ([]User, erro
 		User User `json:"user"`
 	}
 
-	_, err := utils.RequestCall(url, "GET", gh.token, &reviews, nil)
+	err := utils.RequestCall(url, "GET", gh.token, &reviews, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +106,22 @@ func (gh *Client) GetPullRequestPreviousReviewers(prNumber string) ([]User, erro
 	return result, nil
 }
 
+func (gh *Client) GetPullRequestComments(prNumber string) ([]PullRequestComment, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/GoogleCloudPlatform/magic-modules/issues/%s/comments", prNumber)
+
+	var comments []PullRequestComment
+	err := utils.RequestCall(url, "GET", gh.token, &comments, nil)
+	if err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
 func (gh *Client) GetTeamMembers(organization, team string) ([]User, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/teams/%s/members", organization, team)
 
 	var members []User
-	_, err := utils.RequestCall(url, "GET", gh.token, &members, nil)
+	err := utils.RequestCall(url, "GET", gh.token, &members, nil)
 	if err != nil {
 		return nil, err
 	}

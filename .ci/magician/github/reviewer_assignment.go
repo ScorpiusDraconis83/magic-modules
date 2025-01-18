@@ -17,6 +17,7 @@ package github
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -34,37 +35,64 @@ func ChooseCoreReviewers(requestedReviewers, previousReviewers []User) (reviewer
 	newPrimaryReviewer = ""
 
 	for _, reviewer := range requestedReviewers {
-		if IsTeamReviewer(reviewer.Login) {
+		if IsCoreReviewer(reviewer.Login) {
 			hasPrimaryReviewer = true
 			break
 		}
 	}
 
 	for _, reviewer := range previousReviewers {
-		if IsTeamReviewer(reviewer.Login) {
+		if IsCoreReviewer(reviewer.Login) {
 			hasPrimaryReviewer = true
 			reviewersToRequest = append(reviewersToRequest, reviewer.Login)
 		}
 	}
 
 	if !hasPrimaryReviewer {
-		newPrimaryReviewer = GetRandomReviewer()
+		newPrimaryReviewer = GetRandomReviewer(nil)
 		reviewersToRequest = append(reviewersToRequest, newPrimaryReviewer)
 	}
 
 	return reviewersToRequest, newPrimaryReviewer
 }
 
-func FormatReviewerComment(newPrimaryReviewer string, authorUserType UserType, trusted bool) string {
+func FormatReviewerComment(newPrimaryReviewer string) string {
 	tmpl, err := template.New("REVIEWER_ASSIGNMENT_COMMENT.md").Parse(reviewerAssignmentComment)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to parse REVIEWER_ASSIGNMENT_COMMENT.md: %s", err))
 	}
 	sb := new(strings.Builder)
 	tmpl.Execute(sb, map[string]any{
-		"reviewer":       newPrimaryReviewer,
-		"authorUserType": authorUserType.String(),
-		"trusted":        trusted,
+		"reviewer": newPrimaryReviewer,
 	})
 	return sb.String()
+}
+
+var reviewerCommentRegex = regexp.MustCompile("@(?P<reviewer>[^,]*), a repository maintainer, has been assigned")
+
+// FindReviewerComment returns the comment which mentions the current primary reviewer and the reviewer's login,
+// or an empty comment and empty string if no such comment is found.
+// comments should only include comments by the magician in the current PR.
+func FindReviewerComment(comments []PullRequestComment) (PullRequestComment, string) {
+	var newestComment PullRequestComment
+	var currentReviewer string
+	for _, comment := range comments {
+		if !newestComment.CreatedAt.IsZero() && comment.CreatedAt.Before(newestComment.CreatedAt) {
+			// Skip comments older than the newest comment.
+			continue
+		}
+		names := reviewerCommentRegex.SubexpNames()
+		matches := reviewerCommentRegex.FindStringSubmatch(comment.Body)
+		if len(matches) < len(names) {
+			// Skip comments that don't match regex.
+			continue
+		}
+		for i, name := range names {
+			if name == "reviewer" {
+				newestComment = comment
+				currentReviewer = matches[i]
+			}
+		}
+	}
+	return newestComment, currentReviewer
 }

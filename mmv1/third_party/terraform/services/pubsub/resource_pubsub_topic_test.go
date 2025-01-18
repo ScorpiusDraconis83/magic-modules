@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
 )
 
@@ -94,6 +94,9 @@ func TestAccPubsubTopic_schema(t *testing.T) {
 				Config: testAccPubsubTopic_updateWithNewSchema(topic, schema2),
 			},
 			{
+				Config: testAccPubsubTopic_updateWithNewSchema(topic, ""),
+			},
+			{
 				ResourceName:      "google_pubsub_topic.bar",
 				ImportStateId:     topic,
 				ImportState:       true,
@@ -140,6 +143,70 @@ func TestAccPubsubTopic_migration(t *testing.T) {
 	})
 }
 
+func TestAccPubsubTopic_kinesisIngestionUpdate(t *testing.T) {
+	t.Parallel()
+
+	topic := fmt.Sprintf("tf-test-topic-%s", acctest.RandString(t, 10))
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckPubsubTopicDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPubsubTopic_updateWithKinesisIngestionSettings(topic),
+			},
+			{
+				ResourceName:      "google_pubsub_topic.foo",
+				ImportStateId:     topic,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccPubsubTopic_updateWithUpdatedKinesisIngestionSettings(topic),
+			},
+			{
+				ResourceName:      "google_pubsub_topic.foo",
+				ImportStateId:     topic,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccPubsubTopic_cloudStorageIngestionUpdate(t *testing.T) {
+	t.Parallel()
+
+	topic := fmt.Sprintf("tf-test-topic-%s", acctest.RandString(t, 10))
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckPubsubTopicDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPubsubTopic_updateWithCloudStorageIngestionSettings(topic),
+			},
+			{
+				ResourceName:      "google_pubsub_topic.foo",
+				ImportStateId:     topic,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccPubsubTopic_updateWithUpdatedCloudStorageIngestionSettings(topic),
+			},
+			{
+				ResourceName:      "google_pubsub_topic.foo",
+				ImportStateId:     topic,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
 func testAccPubsubTopic_update(topic, key, value string) string {
 	return fmt.Sprintf(`
 resource "google_pubsub_topic" "foo" {
@@ -163,6 +230,7 @@ resource "google_pubsub_topic" "foo" {
     allowed_persistence_regions = [
       "%s",
     ]
+    enforce_in_transit = false
   }
 }
 `, topic, key, value, region)
@@ -196,7 +264,8 @@ resource "google_pubsub_topic" "bar" {
 }
 
 func testAccPubsubTopic_updateWithNewSchema(topic, schema string) string {
-	return fmt.Sprintf(`
+	if schema != "" {
+		return fmt.Sprintf(`
 resource "google_pubsub_schema" "foo" {
 	name = "%s"
 	type = "PROTOCOL_BUFFER"
@@ -211,4 +280,165 @@ resource "google_pubsub_topic" "bar" {
   }
 }
 `, schema, topic)
+	} else {
+		return fmt.Sprintf(`
+		resource "google_pubsub_topic" "bar" {
+			name = "%s"
+		}
+		`, topic)
+	}
+}
+
+func testAccPubsubTopic_updateWithKinesisIngestionSettings(topic string) string {
+	return fmt.Sprintf(`
+resource "google_pubsub_topic" "foo" {
+  name = "%s"
+
+  # Outside of automated terraform-provider-google CI tests, these values must be of actual AWS resources for the test to pass.
+  ingestion_data_source_settings {
+    aws_kinesis {
+        stream_arn = "arn:aws:kinesis:us-west-2:111111111111:stream/fake-stream-name"
+        consumer_arn = "arn:aws:kinesis:us-west-2:111111111111:stream/fake-stream-name/consumer/consumer-1:1111111111"
+        aws_role_arn = "arn:aws:iam::111111111111:role/fake-role-name"
+        gcp_service_account = "fake-service-account@fake-gcp-project.iam.gserviceaccount.com"
+    }
+  }
+}
+`, topic)
+}
+
+func testAccPubsubTopic_updateWithUpdatedKinesisIngestionSettings(topic string) string {
+	return fmt.Sprintf(`
+resource "google_pubsub_topic" "foo" {
+  name = "%s"
+
+  # Outside of automated terraform-provider-google CI tests, these values must be of actual AWS resources for the test to pass.
+  ingestion_data_source_settings {
+    aws_kinesis {
+        stream_arn = "arn:aws:kinesis:us-west-2:111111111111:stream/updated-fake-stream-name"
+        consumer_arn = "arn:aws:kinesis:us-west-2:111111111111:stream/updated-fake-stream-name/consumer/consumer-1:1111111111"
+        aws_role_arn = "arn:aws:iam::111111111111:role/updated-fake-role-name"
+        gcp_service_account = "updated-fake-service-account@fake-gcp-project.iam.gserviceaccount.com"
+    }
+  }
+}
+`, topic)
+}
+
+func testAccPubsubTopic_updateWithCloudStorageIngestionSettings(topic string) string {
+	return fmt.Sprintf(`
+resource "google_pubsub_topic" "foo" {
+  name = "%s"
+
+  # Outside of automated terraform-provider-google CI tests, these values must be of actual Cloud Storage resources for the test to pass.
+  ingestion_data_source_settings {
+    cloud_storage {
+        bucket = "test-bucket"
+        text_format {
+            delimiter = " "
+        }
+        minimum_object_create_time = "2024-01-01T00:00:00Z"
+        match_glob = "foo/**"
+    }
+    platform_logs_settings {
+        severity = "WARNING"
+    }
+  }
+}
+`, topic)
+}
+
+func testAccPubsubTopic_updateWithUpdatedCloudStorageIngestionSettings(topic string) string {
+	return fmt.Sprintf(`
+resource "google_pubsub_topic" "foo" {
+  name = "%s"
+
+  # Outside of automated terraform-provider-google CI tests, these values must be of actual Cloud Storage resources for the test to pass.
+  ingestion_data_source_settings {
+    cloud_storage {
+        bucket = "updated-test-bucket"
+        avro_format {}
+        minimum_object_create_time = "2024-02-02T00:00:00Z"
+        match_glob = "bar/**"
+    }
+    platform_logs_settings {
+        severity = "ERROR"
+    }
+  }
+}
+`, topic)
+}
+
+func TestAccPubsubTopic_azureEventHubsIngestionUpdate(t *testing.T) {
+	t.Parallel()
+
+	topic := fmt.Sprintf("tf-test-topic-%s", acctest.RandString(t, 10))
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckPubsubTopicDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPubsubTopic_updateWithAzureEventHubsIngestionSettings(topic),
+			},
+			{
+				ResourceName:      "google_pubsub_topic.foo",
+				ImportStateId:     topic,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccPubsubTopic_updateWithUpdatedAzureEventHubsIngestionSettings(topic),
+			},
+			{
+				ResourceName:      "google_pubsub_topic.foo",
+				ImportStateId:     topic,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func testAccPubsubTopic_updateWithAzureEventHubsIngestionSettings(topic string) string {
+	return fmt.Sprintf(`
+resource "google_pubsub_topic" "foo" {
+  name = "%s"
+
+  # Outside of automated terraform-provider-google CI tests, these values must be of actual Cloud Storage resources for the test to pass.
+  ingestion_data_source_settings {
+  	azure_event_hubs {
+		resource_group = "azure-ingestion-resource-group"
+		namespace = "azure-ingestion-namespace"
+		event_hub = "azure-ingestion-event-hub"
+		client_id = "aZZZZZZZ-YYYY-HHHH-GGGG-abcdef569123"
+		tenant_id = "0XXXXXXX-YYYY-HHHH-GGGG-123456789123"
+		subscription_id = "bXXXXXXX-YYYY-HHHH-GGGG-123456789123"
+		gcp_service_account = "fake-service-account@fake-gcp-project.iam.gserviceaccount.com"
+    }
+  }
+}
+`, topic)
+}
+
+func testAccPubsubTopic_updateWithUpdatedAzureEventHubsIngestionSettings(topic string) string {
+	return fmt.Sprintf(`
+resource "google_pubsub_topic" "foo" {
+  name = "%s"
+
+  # Outside of automated terraform-provider-google CI tests, these values must be of actual Cloud Storage resources for the test to pass.
+  ingestion_data_source_settings {
+  	azure_event_hubs {
+		resource_group = "ingestion-resource-group"
+		namespace = "ingestion-namespace"
+		event_hub = "ingestion-event-hub"
+		client_id = "aZZZZZZZ-YYYY-HHHH-GGGG-abcdef123456"
+		tenant_id = "0XXXXXXX-YYYY-HHHH-GGGG-123456123456"
+		subscription_id = "bXXXXXXX-YYYY-HHHH-GGGG-123456123456"
+		gcp_service_account = "fake-account@new-gcp-project.iam.gserviceaccount.com"
+    }
+  }
+}
+`, topic)
 }
